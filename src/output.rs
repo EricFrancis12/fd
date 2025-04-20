@@ -74,6 +74,7 @@ fn print_entry_format<W: Write>(
     let output = format.generate(
         entry.stripped_path(config),
         config.path_separator.as_deref(),
+        Some(entry),
     );
     // TODO: support writing raw bytes on unix?
     write!(stdout, "{}", output.to_string_lossy())

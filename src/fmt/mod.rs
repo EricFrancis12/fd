@@ -3,10 +3,13 @@ mod input;
 use std::borrow::Cow;
 use std::ffi::{OsStr, OsString};
 use std::fmt::{self, Display, Formatter};
+use std::os::windows::fs::MetadataExt;
 use std::path::{Component, Path, Prefix};
 use std::sync::OnceLock;
 
 use aho_corasick::AhoCorasick;
+
+use crate::dir_entry::DirEntry;
 
 use self::input::{basename, dirname, remove_extension};
 
@@ -21,6 +24,7 @@ pub enum Token {
     Parent,
     NoExt,
     BasenameNoExt,
+    NumBytes,
     Text(String),
 }
 
@@ -32,6 +36,7 @@ impl Display for Token {
             Token::Parent => f.write_str("{//}")?,
             Token::NoExt => f.write_str("{.}")?,
             Token::BasenameNoExt => f.write_str("{/.}")?,
+            Token::NumBytes => f.write_str("{bytes}")?,
             Token::Text(ref string) => f.write_str(string)?,
         }
         Ok(())
@@ -62,7 +67,7 @@ impl FormatTemplate {
         let mut remaining = fmt;
         let mut buf = String::new();
         let placeholders = PLACEHOLDERS.get_or_init(|| {
-            AhoCorasick::new(["{{", "}}", "{}", "{/}", "{//}", "{.}", "{/.}"]).unwrap()
+            AhoCorasick::new(["{{", "}}", "{}", "{/}", "{//}", "{.}", "{/.}", "{bytes}"]).unwrap()
         });
         while let Some(m) = placeholders.find(remaining) {
             match m.pattern().as_u32() {
@@ -109,7 +114,12 @@ impl FormatTemplate {
     /// Generate a result string from this template. If path_separator is Some, then it will replace
     /// the path separator in all placeholder tokens. Fixed text and tokens are not affected by
     /// path separator substitution.
-    pub fn generate(&self, path: impl AsRef<Path>, path_separator: Option<&str>) -> OsString {
+    pub fn generate(
+        &self,
+        path: impl AsRef<Path>,
+        path_separator: Option<&str>,
+        entry: Option<&DirEntry>,
+    ) -> OsString {
         use Token::*;
         let path = path.as_ref();
 
@@ -130,6 +140,15 @@ impl FormatTemplate {
                         Parent => s.push(Self::replace_separator(&dirname(path), path_separator)),
                         Placeholder => {
                             s.push(Self::replace_separator(path.as_ref(), path_separator))
+                        }
+                        NumBytes => {
+                            if let Some(e) = entry {
+                                if let Some(metadata) = e.metadata() {
+                                    s.push(format!("{}", metadata.file_size()));
+                                    continue;
+                                }
+                            }
+                            s.push(NumBytes.to_string());
                         }
                         Text(ref string) => s.push(string),
                     }
@@ -206,6 +225,7 @@ fn token_from_pattern_id(id: u32) -> Token {
         4 => Parent,
         5 => NoExt,
         6 => BasenameNoExt,
+        7 => NumBytes,
         _ => unreachable!(),
     }
 }
@@ -267,7 +287,10 @@ mod fmt_tests {
         path.push("folder");
         path.push("file.txt");
 
-        let expanded = templ.generate(&path, Some("/")).into_string().unwrap();
+        let expanded = templ
+            .generate(&path, Some("/"), None)
+            .into_string()
+            .unwrap();
 
         assert_eq!(
             expanded,

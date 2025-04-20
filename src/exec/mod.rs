@@ -145,9 +145,9 @@ impl CommandBuilder {
             if arg.has_tokens() {
                 path_arg = Some(arg.clone());
             } else if path_arg.is_none() {
-                pre_args.push(arg.generate("", None));
+                pre_args.push(arg.generate("", None, None));
             } else {
-                post_args.push(arg.generate("", None));
+                post_args.push(arg.generate("", None, None));
             }
         }
 
@@ -178,7 +178,7 @@ impl CommandBuilder {
             self.finish()?;
         }
 
-        let arg = self.path_arg.generate(path, separator);
+        let arg = self.path_arg.generate(path, separator, None);
         if !self
             .cmd
             .args_would_fit(iter::once(&arg).chain(&self.post_args))
@@ -262,9 +262,9 @@ impl CommandTemplate {
     /// Using the internal `args` field, and a supplied `input` variable, a `Command` will be
     /// build.
     fn generate(&self, input: &Path, path_separator: Option<&str>) -> io::Result<Command> {
-        let mut cmd = Command::new(self.args[0].generate(input, path_separator));
+        let mut cmd = Command::new(self.args[0].generate(input, path_separator, None));
         for arg in &self.args[1..] {
-            cmd.try_arg(arg.generate(input, path_separator))?;
+            cmd.try_arg(arg.generate(input, path_separator, None))?;
         }
         Ok(cmd)
     }
@@ -278,7 +278,7 @@ mod tests {
         template
             .args
             .iter()
-            .map(|arg| arg.generate(input, None).into_string().unwrap())
+            .map(|arg| arg.generate(input, None, None).into_string().unwrap())
             .collect()
     }
 
@@ -434,7 +434,10 @@ mod tests {
         let arg = FormatTemplate::Tokens(vec![Token::Placeholder]);
         macro_rules! check {
             ($input:expr, $expected:expr) => {
-                assert_eq!(arg.generate($input, Some("#")), OsString::from($expected));
+                assert_eq!(
+                    arg.generate($input, Some("#"), None),
+                    OsString::from($expected)
+                );
             };
         }
 
@@ -449,7 +452,10 @@ mod tests {
         let arg = FormatTemplate::Tokens(vec![Token::Placeholder]);
         macro_rules! check {
             ($input:expr, $expected:expr) => {
-                assert_eq!(arg.generate($input, Some("#")), OsString::from($expected));
+                assert_eq!(
+                    arg.generate($input, Some("#"), None),
+                    OsString::from($expected)
+                );
             };
         }
 
