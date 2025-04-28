@@ -36,7 +36,7 @@ impl Display for Token {
             Token::Parent => f.write_str("{//}")?,
             Token::NoExt => f.write_str("{.}")?,
             Token::BasenameNoExt => f.write_str("{/.}")?,
-            Token::NumBytes => f.write_str("{bytes}")?,
+            Token::NumBytes => f.write_str("{b}")?,
             Token::Text(ref string) => f.write_str(string)?,
         }
         Ok(())
@@ -67,7 +67,7 @@ impl FormatTemplate {
         let mut remaining = fmt;
         let mut buf = String::new();
         let placeholders = PLACEHOLDERS.get_or_init(|| {
-            AhoCorasick::new(["{{", "}}", "{}", "{/}", "{//}", "{.}", "{/.}", "{bytes}"]).unwrap()
+            AhoCorasick::new(["{{", "}}", "{}", "{/}", "{//}", "{.}", "{/.}", "{b}"]).unwrap()
         });
         while let Some(m) = placeholders.find(remaining) {
             match m.pattern().as_u32() {
